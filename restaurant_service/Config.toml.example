@@ -1,0 +1,6 @@
+# restaurant config example: copy to Config.toml (gitignored) and fill in
+# port = 9002
+# kafkaBootstrapServers = "localhost:9092"
+# consumerGroupId = "restaurant-service-group"
+# dbUri = "mongodb://localhost:27017"
+# dbName = "restaurant_db"
