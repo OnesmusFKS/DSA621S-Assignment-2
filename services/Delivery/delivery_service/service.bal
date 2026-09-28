@@ -1,56 +1,84 @@
-// delivery_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// findAvailableDriver() / assignDriver(orderId)
-//     selection logic (nearest or first available)
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int deliveryServicePort = ?;
 
-// handleNoDriverAvailable(orderId)
-//     retry with backoff or leave pending; consider a timer/scheduled retry
+final kafka:Producer deliveryEventProducer = check new (kafkaBroker);
+final kafka:Consumer orderReadyConsumer = check new (kafkaBroker, groupId = "delivery-service");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// POST /drivers -> registerDriver
-//     
+// ---------- Kafka client setup ----------
+function getKafkaProducer() returns kafka:Producer {
+    // return producer instance
+}
 
-// PUT /drivers/{id}/status -> updateDriverStatus
-//     
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// PUT /drivers/{id}/location -> updateDriverLocation
-//     bonus: location simulation
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /deliveries/{id} -> getDelivery
-//     
+// ---------- Kafka consumer ----------
+function onOrderReady() {
+    // trigger findAvailableDriver + assignDriver
+}
 
-// GET /deliveries/order/{orderId} -> trackDelivery
-//     
+// ---------- Driver assignment ----------
+function findAvailableDriver(string restaurantId) returns string? {
+    // pick an available driver
+}
 
-// PUT /deliveries/{id}/pickup -> confirmPickup
-//     
+function handleNoDriverAvailable(string orderId) {
+    // retry or queue
+}
 
-// PUT /deliveries/{id}/complete -> completeDelivery
-//     free the driver, publish delivery.completed
+// ---------- Kafka producers ----------
+function publishDeliveryAssigned(string orderId, string driverId) {
+    // publish to delivery.assigned
+}
 
-// GET /health -> healthCheck
-//     
+function publishDeliveryCompleted(string orderId, string driverId) {
+    // publish to delivery.completed
+}
 
-// ---- Cross-cutting ----
+// ---------- REST API ----------
+service /deliveries on new http:Listener(deliveryServicePort) {
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+    resource function post drivers(http:Request req) returns http:Response {
+        // registerDriver
+    }
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+    resource function put drivers/[string driverId]/status(http:Request req) returns http:Response {
+        // updateDriverStatus (AVAILABLE/BUSY/OFFLINE)
+    }
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+    resource function post assign(http:Request req) returns http:Response {
+        // assignDriver
+    }
 
+    resource function put [string deliveryId]/status(http:Request req) returns http:Response {
+        // updateDeliveryStatus
+    }
 
-// ---- Failure paths to handle ----
+    resource function get [string deliveryId]() returns http:Response {
+        // getDelivery
+    }
 
-// no driver available
-//     handleNoDriverAvailable: retry timer, don't lose the order
+    resource function get [string deliveryId]/track() returns http:Response {
+        // trackDelivery
+    }
 
-// driver goes offline mid-delivery
-//     reassign or mark FAILED
+    resource function post [string deliveryId]/complete() returns http:Response {
+        // completeDelivery
+    }
 
-// two orders claim the same driver
-//     claimDriverAtomic
-
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}

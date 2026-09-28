@@ -1,44 +1,75 @@
-// customer_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// POST /customers -> registerCustomer
-//     validate input, reject duplicate email
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int customerServicePort = ?;
 
-// GET /customers/{id} -> getCustomer
-//     
+final kafka:Producer orderEventProducer = check new (kafkaBroker);
+final kafka:Consumer orderEventConsumer = check new (kafkaBroker, groupId = "customer-service");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// PUT /customers/{id} -> updateCustomer
-//     
+// ---------- Kafka client setup ----------
+function getKafkaProducer() returns kafka:Producer {
+    // return producer instance
+}
 
-// DELETE /customers/{id} -> deleteCustomer
-//     
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// POST /customers/{id}/addresses -> addAddress
-//     
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /customers/{id}/addresses -> getAddresses
-//     
+// ---------- Kafka consumer: order events ----------
+function onOrderEvent() {
+    // subscribe to orders.created, orders.status.changed
+    // update local order history copy
+}
 
-// PUT /customers/{id}/addresses/{addrId} -> updateAddress
-//     
+// ---------- REST API ----------
+service /customers on new http:Listener(customerServicePort) {
 
-// DELETE /customers/{id}/addresses/{addrId} -> removeAddress
-//     
+    resource function post registerCustomer(http:Request req) returns http:Response {
+        // create account
+    }
 
-// GET /customers/{id}/orders -> getOrderHistory
-//     
+    resource function get [string customerId]() returns http:Response {
+        // getCustomer
+    }
 
-// GET /health -> healthCheck
-//     
+    resource function put [string customerId](http:Request req) returns http:Response {
+        // updateCustomer
+    }
 
-// ---- Cross-cutting ----
+    resource function delete [string customerId]() returns http:Response {
+        // deleteCustomer
+    }
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+    resource function post [string customerId]/addresses(http:Request req) returns http:Response {
+        // addAddress
+    }
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+    resource function get [string customerId]/addresses() returns http:Response {
+        // getAddresses
+    }
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+    resource function put [string customerId]/addresses/[string addressId](http:Request req) returns http:Response {
+        // updateAddress
+    }
 
+    resource function delete [string customerId]/addresses/[string addressId]() returns http:Response {
+        // removeAddress
+    }
+
+    resource function get [string customerId]/orders() returns http:Response {
+        // getOrderHistory (from local copy)
+    }
+
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}

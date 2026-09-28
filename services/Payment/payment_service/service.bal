@@ -1,41 +1,68 @@
-// payment_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// processPayment(orderId, amount) returns Payment
-//     simulate outcome (e.g. random or amount-based failure)
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int paymentServicePort = ?;
 
-// refundPayment(orderId)
-//     mark REFUNDED, publish refund event
+final kafka:Producer paymentEventProducer = check new (kafkaBroker);
+final kafka:Consumer orderCreatedConsumer = check new (kafkaBroker, groupId = "payment-service");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// GET /payments/{id} -> getPayment
-//     
+// ---------- Kafka client setup ----------
+function getKafkaProducer() returns kafka:Producer {
+    // return producer instance
+}
 
-// GET /payments/order/{orderId} -> getPaymentByOrder
-//     
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// POST /payments/{orderId}/refund -> manual refund
-//     
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /health -> healthCheck
-//     
+// ---------- Kafka consumer ----------
+function onOrderCreated() {
+    // trigger processPayment
+}
 
-// ---- Cross-cutting ----
+// ---------- Idempotency ----------
+function checkDuplicatePayment(string orderId) returns boolean {
+    // check if a payment already exists for this order
+}
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+// ---------- Kafka producers ----------
+function publishPaymentCompleted(string orderId, string paymentId) {
+    // publish to payments.completed
+}
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+function publishPaymentFailed(string orderId, string reason) {
+    // publish to payments.failed
+}
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+// ---------- REST API ----------
+service /payments on new http:Listener(paymentServicePort) {
 
+    resource function post process(http:Request req) returns http:Response {
+        // processPayment: simulate success/failure
+    }
 
-// ---- Failure paths to handle ----
+    resource function get [string paymentId]() returns http:Response {
+        // getPayment
+    }
 
-// duplicate orders.created delivery
-//     must NOT charge twice: check paymentExistsForOrder
+    resource function get order/[string orderId]() returns http:Response {
+        // getPaymentByOrder
+    }
 
-// refund for order that was never paid
-//     no-op with clear result
+    resource function post [string paymentId]/refund() returns http:Response {
+        // refundPayment: for cancelled orders
+    }
 
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}

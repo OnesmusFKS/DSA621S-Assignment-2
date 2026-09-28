@@ -1,41 +1,73 @@
-// notification_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// buildMessage(eventType, payload) returns string
-//     template per event and recipient type
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int notificationServicePort = ?;
 
-// notifyCustomer / notifyRestaurant / notifyDriver
-//     decide which recipients get which event
+final kafka:Consumer eventConsumer = check new (kafkaBroker, groupId = "notification-service");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// sendEmail / sendSMS / sendPush
-//     simulated channels (log/print + save)
+// ---------- Kafka client setup ----------
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// saveNotification(Notification)
-//     
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /notifications/{recipientType}/{id} -> getNotifications
-//     
+// ---------- Kafka consumer (multiple topics) ----------
+function onAnyEvent() {
+    // subscribe to orders.*, payments.*, delivery.*
+    // buildMessage -> notifyCustomer / notifyRestaurant / notifyDriver
+}
 
-// GET /health -> healthCheck
-//     
+// ---------- Message building ----------
+function buildMessage(string eventType, json payload, string recipientType) returns string {
+    // template per event and recipient type
+}
 
-// ---- Cross-cutting ----
+// ---------- Channel dispatch ----------
+function notifyCustomer(string customerId, string message) {
+    // sendEmail / sendSMS / sendPush
+}
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+function notifyRestaurant(string restaurantId, string message) {
+    // sendEmail / sendSMS / sendPush
+}
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+function notifyDriver(string driverId, string message) {
+    // sendEmail / sendSMS / sendPush
+}
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+function sendEmail(string recipient, string message) {
+    // simulated email channel
+}
 
+function sendSMS(string recipient, string message) {
+    // simulated SMS channel
+}
 
-// ---- Failure paths to handle ----
+function sendPush(string recipient, string message) {
+    // simulated push channel
+}
 
-// channel send fails
-//     retry, then log failure; must never block other consumers
+// ---------- Persistence ----------
+function saveNotification(string recipientId, string message) returns error? {
+    // log notification to DB
+}
 
-// unknown event type
-//     log and skip, do not crash the consumer
+// ---------- REST API ----------
+service /notifications on new http:Listener(notificationServicePort) {
 
+    resource function get [string recipientId]() returns http:Response {
+        // getNotifications
+    }
+
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}

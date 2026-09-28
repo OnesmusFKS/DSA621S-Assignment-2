@@ -1,62 +1,101 @@
-// order_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// isValidTransition(from, to) returns boolean
-//     state machine guard (helper, not an endpoint)
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int orderServicePort = ?;
 
-// updateOrderStatus(orderId, newStatus, actor)
-//     the ONLY function allowed to change status; validates, persists, logs history, publishes event
+final kafka:Producer orderEventProducer = check new (kafkaBroker);
+final kafka:Consumer paymentConsumer = check new (kafkaBroker, groupId = "order-service-payment");
+final kafka:Consumer deliveryConsumer = check new (kafkaBroker, groupId = "order-service-delivery");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// POST /orders -> createOrder
-//     validate, save as CREATED, publish orders.created
+// ---------- Kafka client setup ----------
+function getKafkaProducer() returns kafka:Producer {
+    // return producer instance
+}
 
-// GET /orders/{id} -> getOrder
-//     
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// GET /orders?customerId= / ?restaurantId= -> listOrders
-//     
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /orders/{id}/history -> getStatusHistory
-//     
+// ---------- State machine ----------
+function isValidTransition(string currentStatus, string newStatus) returns boolean {
+    // validate CREATED -> CONFIRMED -> PREPARING -> READY -> OUT_FOR_DELIVERY -> DELIVERED (or CANCELLED)
+}
 
-// PUT /orders/{id}/preparing -> startPreparing
-//     restaurant action
+function updateOrderStatus(string orderId, string newStatus) returns error? {
+    // the only function that changes status
+}
 
-// PUT /orders/{id}/ready -> markReady
-//     restaurant action
+// ---------- Kafka producers ----------
+function publishStatusChanged(string orderId, string newStatus) {
+    // publish to orders.status.changed
+}
 
-// PUT /orders/{id}/cancel -> cancelOrder
-//     only allowed in early states
+// ---------- Kafka consumers ----------
+function onPaymentCompleted() {
+    // CREATED -> CONFIRMED
+}
 
-// GET /health -> healthCheck
-//     
+function onPaymentFailed() {
+    // cancel order
+}
 
-// ---- Cross-cutting ----
+function onDeliveryAssigned() {
+    // update to OUT_FOR_DELIVERY if applicable
+}
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+function onDeliveryPickedUp() {
+    // update to OUT_FOR_DELIVERY
+}
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+function onDeliveryCompleted() {
+    // DELIVERED
+}
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+// ---------- REST API ----------
+service /orders on new http:Listener(orderServicePort) {
 
+    resource function post create(http:Request req) returns http:Response {
+        // createOrder: save as CREATED, publish orders.created
+    }
 
-// ---- Failure paths to handle ----
+    resource function get [string orderId]() returns http:Response {
+        // getOrder
+    }
 
-// payment failed -> CANCELLED
-//     publish orders.cancelled so stock is released
+    resource function get customer/[string customerId]() returns http:Response {
+        // listOrdersByCustomer
+    }
 
-// stock rejected / restaurant closed -> CANCELLED
-//     notify customer
+    resource function get restaurant/[string restaurantId]() returns http:Response {
+        // listOrdersByRestaurant
+    }
 
-// payment or stock timeout
-//     scheduled check: cancel orders stuck in CREATED beyond N minutes
+    resource function post [string orderId]/cancel() returns http:Response {
+        // cancelOrder: only allowed in early states
+    }
 
-// duplicate createOrder (client retry)
-//     use idempotency key
+    resource function post [string orderId]/confirm() returns http:Response {
+        // confirmOrder
+    }
 
-// illegal transition attempt
-//     return 409 Conflict, do not change state
+    resource function post [string orderId]/prepare() returns http:Response {
+        // startPreparing
+    }
 
+    resource function post [string orderId]/ready() returns http:Response {
+        // markReady
+    }
+
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}
