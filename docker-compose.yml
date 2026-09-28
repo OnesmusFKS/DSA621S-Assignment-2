@@ -1,0 +1,15 @@
+# docker-compose.yml (STUB, comments only)
+#
+# Infrastructure services:
+#   - kafka (KRaft or with zookeeper), with healthcheck
+#   - kafka-init: one-shot container running kafka/create-topics.sh, depends_on kafka healthy
+#   - mongo (single instance is fine), with volume for persistence + healthcheck
+#   - optional: kafka-ui for the demo
+#
+# Application services (7): customer 9001, restaurant 9002, order 9003, payment 9004,
+#   delivery 9005, notification 9006, admin 9007
+#   For each: build context, env vars (from .env), ports, depends_on (kafka-init + mongo healthy),
+#   restart policy, shared network
+#
+# Also decide: named volumes, one network, .env usage, startup order, restart on crash
+# Bonus: prometheus + grafana services
