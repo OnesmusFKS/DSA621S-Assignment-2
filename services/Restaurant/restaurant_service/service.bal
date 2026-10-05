@@ -1,67 +1,92 @@
-// restaurant_service: HTTP endpoints and business logic
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/http;
+import ballerina/kafka;
+import ballerina/mongodb;
+import ballerina/log;
 
-// POST /restaurants -> registerRestaurant
-//
+configurable string kafkaBroker = ?;
+configurable string mongoUri = ?;
+configurable int restaurantServicePort = ?;
 
-// GET /restaurants -> listRestaurants
-//     optional filter: open now, cuisine
+final kafka:Producer stockResultProducer = check new (kafkaBroker);
+final kafka:Consumer orderCreatedConsumer = check new (kafkaBroker, groupId = "restaurant-service");
+final mongodb:Client dbClient = check new (mongoUri);
 
-// GET /restaurants/{id} -> getRestaurant
-//
+// ---------- Kafka client setup ----------
+function getKafkaProducer() returns kafka:Producer {
+    // return producer instance
+}
 
-// PUT /restaurants/{id} -> updateRestaurant
-//
+function getKafkaConsumer() returns kafka:Consumer {
+    // return consumer instance
+}
 
-// POST /restaurants/{id}/menu -> addMenuItem
-//
+function getDbClient() returns mongodb:Client {
+    // return db client
+}
 
-// GET /restaurants/{id}/menu -> getMenu
-//
+// ---------- Kafka consumer: order created ----------
+function onOrderCreated() {
+    // validate restaurant is open and stock is available, then reserve it
+    // call publishStockResult
+}
 
-// PUT /restaurants/{id}/menu/{itemId} -> updateMenuItem
-//
+// ---------- Kafka producer: stock result ----------
+function publishStockResult(string orderId, boolean reserved) {
+    // publish to stock.reserved or stock.rejected topic
+}
 
-// DELETE /restaurants/{id}/menu/{itemId} -> removeMenuItem
-//
+// ---------- REST API ----------
+service /restaurants on new http:Listener(restaurantServicePort) {
 
-// PUT /restaurants/{id}/hours -> setOpeningHours
-//
+    resource function post registerRestaurant(http:Request req) returns http:Response {
+        // registerRestaurant
+    }
 
-// GET /restaurants/{id}/hours -> getOpeningHours
-//
+    resource function get [string restaurantId]() returns http:Response {
+        // getRestaurant
+    }
 
-// GET /restaurants/{id}/open -> isOpenNow
-//
+    resource function get list() returns http:Response {
+        // listRestaurants
+    }
 
-// GET /restaurants/{id}/inventory -> checkStock
-//
+    resource function post [string restaurantId]/menu(http:Request req) returns http:Response {
+        // addMenuItem
+    }
 
-// PUT /restaurants/{id}/inventory/{itemId} -> updateStock
-//     manual restock
+    resource function put [string restaurantId]/menu/[string itemId](http:Request req) returns http:Response {
+        // updateMenuItem
+    }
 
-// GET /health -> healthCheck
-//
+    resource function delete [string restaurantId]/menu/[string itemId]() returns http:Response {
+        // removeMenuItem
+    }
 
-// ---- Cross-cutting ----
+    resource function get [string restaurantId]/menu() returns http:Response {
+        // getMenu
+    }
 
-// validateRequest(input)
-//     reusable input validation, return 400 with a clear message
+    resource function put [string restaurantId]/hours(http:Request req) returns http:Response {
+        // setOpeningHours
+    }
 
-// errorResponse(status, message)
-//     consistent error format across all endpoints
+    resource function get [string restaurantId]/is-open() returns http:Response {
+        // isOpenNow
+    }
 
-// logEvent(level, message, context)
-//     structured logging with orderId for tracing across services
+    resource function get [string restaurantId]/stock/[string itemId]() returns http:Response {
+        // checkStock
+    }
 
+    resource function post [string restaurantId]/stock/reserve(http:Request req) returns http:Response {
+        // reserveStock
+    }
 
-// ---- Failure paths to handle ----
+    resource function post [string restaurantId]/stock/release(http:Request req) returns http:Response {
+        // releaseStock
+    }
 
-// simultaneous orders for last item
-//     use decrementStockAtomic, reject the loser
-
-// partial stock (order has 3 items, 1 unavailable)
-//     reject whole order and roll back reservations
-
-// restaurant closed
-//     reject with reason
+    resource function get health() returns http:Response {
+        // healthCheck
+    }
+}
