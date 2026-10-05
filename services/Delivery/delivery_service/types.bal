@@ -1,25 +1,49 @@
-// delivery_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+const string PENDING_DRIVER = "PENDING_DRIVER";
+const string ASSIGNED = "ASSIGNED";
+const string PICKED_UP = "PICKED_UP";
+const string DELIVERED = "DELIVERED";
+const string CANCELLED = "CANCELLED";
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+public type DriverInput record {|
+    string name;
+    string phone;
+    string vehicle = "motorbike";
+|};
 
-// enum DriverStatus
-//     AVAILABLE, BUSY, OFFLINE
+public type Driver record {|
+    string driverId;
+    string name;
+    string phone;
+    string vehicle = "motorbike";
+    boolean available = true;
+    float lat = 0.0;
+    float lng = 0.0;
+    string updatedAt = "";
+|};
 
-// enum DeliveryStatus
-//     PENDING_ASSIGNMENT, ASSIGNED, PICKED_UP, IN_TRANSIT, DELIVERED, FAILED
+public type AvailabilityUpdate record {|
+    boolean available;
+|};
 
-// record Driver
-//     id, name, phone, vehicle, status, currentLocation
+public type LocationUpdate record {|
+    float lat;
+    float lng;
+|};
 
-// record Delivery
-//     id, orderId, driverId, restaurantAddress, customerAddress, status, timestamps
+public type Delivery record {|
+    string deliveryId;
+    string orderId;
+    string customerId = "";
+    string restaurantId = "";
+    string driverId = "";
+    string status;
+    string createdAt;
+    string updatedAt;
+|};
 
-// record Location
-//     lat, lng, updatedAt
-
-// record DeliveryEvent
-//     payload published
-
-// record OrderReadyEvent
-//     payload consumed
+public type DriverLocation record {|
+    string driverId;
+    float lat;
+    float lng;
+    string updatedAt;
+|};

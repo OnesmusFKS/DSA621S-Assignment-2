@@ -1,16 +1,44 @@
-// admin_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+public type OrderSummary record {|
+    string orderId;
+    string restaurantId = "";
+    string customerId = "";
+    float totalAmount = 0.0;
+    string status = "CREATED";
+    boolean paid = false;
+    string driverId = "";
+    string createdAt = "";
+    string assignedAt = "";
+    string deliveredAt = "";
+|};
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+public type SummaryReport record {|
+    int totalOrders;
+    int delivered;
+    int cancelled;
+    int inProgress;
+    float totalRevenue;
+    map<int> ordersByStatus;
+|};
 
-// record RestaurantStats
-//     restaurantId, totalOrders, revenue, cancelledOrders, topItems
+public type RestaurantStats record {|
+    string restaurantId;
+    int totalOrders;
+    int delivered;
+    int cancelled;
+    float revenue;
+    float avgOrderValue;
+|};
 
-// record DeliveryPerformance
-//     avgDeliveryTime, onTimeRate, deliveriesPerDriver
+public type DriverStats record {|
+    string driverId;
+    int assigned;
+    int completed;
+|};
 
-// record OrderStatusBreakdown
-//     count per OrderStatus
-
-// record GenericEvent
-//     envelope for consumed events
+public type DeliveryReport record {|
+    int totalDeliveries;
+    int completed;
+    int inProgress;
+    float avgDeliveryMinutes;
+    DriverStats[] drivers;
+|};

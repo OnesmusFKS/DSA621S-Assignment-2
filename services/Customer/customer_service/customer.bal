@@ -1,5 +1,5 @@
-import ballerina/io;
+import ballerina/log;
 
 public function main() {
-    io:println("Hello, World!");
+    log:printInfo("Customer service running on port " + port.toString());
 }

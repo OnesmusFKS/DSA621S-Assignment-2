@@ -1,27 +1,34 @@
-// admin_service: Database access functions
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerinax/mongodb;
 
-// initDb() returns error?
-//     create client (read-model collections)
+final mongodb:Client mongoClient = check new ({connection: mongoUri});
+final mongodb:Database db = check mongoClient->getDatabase(dbName);
 
-// upsertOrderStat / upsertDeliveryStat
-//     update aggregates from events
+// Idempotency: returns true the first time an eventId is seen, false for duplicates
+function markProcessed(string eventId) returns boolean|error {
+    mongodb:Collection c = check db->getCollection("processed_events");
+    int n = check c->countDocuments({eventId: eventId});
+    if n > 0 {
+        return false;
+    }
+    check c->insertOne({eventId: eventId, processedAt: nowIso()});
+    return true;
+}
 
-// aggregateRestaurantStats(restaurantId, from, to)
-//     
+function ensureSummary(string orderId) returns error? {
+    mongodb:Collection c = check db->getCollection("order_summaries");
+    int n = check c->countDocuments({orderId: orderId});
+    if n == 0 {
+        check c->insertOne({orderId: orderId});
+    }
+}
 
-// aggregateDeliveryPerformance(from, to)
-//     
+function updateSummary(string orderId, map<json> fields) returns error? {
+    mongodb:Collection c = check db->getCollection("order_summaries");
+    _ = check c->updateOne({orderId: orderId}, {set: fields});
+}
 
-// countOrdersByStatus()
-//     
-
-// ---- Reliability (all services) ----
-
-// insertProcessedEvent / findProcessedEvent
-//     processed_events collection, unique index on eventId
-
-// checkDbConnection() returns boolean
-//     used by /health
-
-// Database isolation: this service owns ONLY `admin_db`. Never read another service's DB.
+function listSummaries() returns OrderSummary[]|error {
+    mongodb:Collection c = check db->getCollection("order_summaries");
+    stream<OrderSummary, error?> s = check c->find({}, projection = {"_id": 0}, targetType = OrderSummary);
+    return from OrderSummary o in s select o;
+}

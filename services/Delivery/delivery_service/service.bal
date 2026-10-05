@@ -1,84 +1,134 @@
 import ballerina/http;
-import ballerina/kafka;
-import ballerina/mongodb;
-import ballerina/log;
+import ballerina/uuid;
 
-configurable string kafkaBroker = ?;
-configurable string mongoUri = ?;
-configurable int deliveryServicePort = ?;
+public type DriverCreated record {|
+    *http:Created;
+    Driver body;
+|};
 
-final kafka:Producer deliveryEventProducer = check new (kafkaBroker);
-final kafka:Consumer orderReadyConsumer = check new (kafkaBroker, groupId = "delivery-service");
-final mongodb:Client dbClient = check new (mongoUri);
+listener http:Listener httpListener = new (port);
 
-// ---------- Kafka client setup ----------
-function getKafkaProducer() returns kafka:Producer {
-    // return producer instance
-}
+service /drivers on httpListener {
 
-function getKafkaConsumer() returns kafka:Consumer {
-    // return consumer instance
-}
-
-function getDbClient() returns mongodb:Client {
-    // return db client
-}
-
-// ---------- Kafka consumer ----------
-function onOrderReady() {
-    // trigger findAvailableDriver + assignDriver
-}
-
-// ---------- Driver assignment ----------
-function findAvailableDriver(string restaurantId) returns string? {
-    // pick an available driver
-}
-
-function handleNoDriverAvailable(string orderId) {
-    // retry or queue
-}
-
-// ---------- Kafka producers ----------
-function publishDeliveryAssigned(string orderId, string driverId) {
-    // publish to delivery.assigned
-}
-
-function publishDeliveryCompleted(string orderId, string driverId) {
-    // publish to delivery.completed
-}
-
-// ---------- REST API ----------
-service /deliveries on new http:Listener(deliveryServicePort) {
-
-    resource function post drivers(http:Request req) returns http:Response {
-        // registerDriver
+    resource function post .(DriverInput input) returns DriverCreated|error {
+        Driver d = {
+            driverId: uuid:createType4AsString(),
+            name: input.name,
+            phone: input.phone,
+            vehicle: input.vehicle,
+            updatedAt: nowIso()
+        };
+        check insertDriver(d);
+        // a new free driver can pick up waiting orders
+        check assignPending();
+        return <DriverCreated>{body: d};
     }
 
-    resource function put drivers/[string driverId]/status(http:Request req) returns http:Response {
-        // updateDriverStatus (AVAILABLE/BUSY/OFFLINE)
+    resource function get .() returns Driver[]|error {
+        return listDrivers();
     }
 
-    resource function post assign(http:Request req) returns http:Response {
-        // assignDriver
+    resource function get [string driverId]() returns Driver|http:NotFound|error {
+        Driver? d = check findDriver(driverId);
+        if d is () {
+            return <http:NotFound>{body: {message: "Driver not found"}};
+        }
+        return d;
     }
 
-    resource function put [string deliveryId]/status(http:Request req) returns http:Response {
-        // updateDeliveryStatus
+    resource function put [string driverId]/availability(AvailabilityUpdate u) returns Driver|http:NotFound|error {
+        Driver? d = check findDriver(driverId);
+        if d is () {
+            return <http:NotFound>{body: {message: "Driver not found"}};
+        }
+        check setAvailability(driverId, u.available);
+        d.available = u.available;
+        if u.available {
+            check assignPending();
+        }
+        return d;
     }
 
-    resource function get [string deliveryId]() returns http:Response {
-        // getDelivery
+    // Driver location simulation / real-time tracking
+    resource function put [string driverId]/location(LocationUpdate u) returns Driver|http:NotFound|error {
+        Driver? d = check findDriver(driverId);
+        if d is () {
+            return <http:NotFound>{body: {message: "Driver not found"}};
+        }
+        check setLocation(driverId, u.lat, u.lng);
+        d.lat = u.lat;
+        d.lng = u.lng;
+        return d;
+    }
+}
+
+service /deliveries on httpListener {
+
+    resource function get .(string status = "") returns Delivery[]|error {
+        return listDeliveries(status);
     }
 
-    resource function get [string deliveryId]/track() returns http:Response {
-        // trackDelivery
+    resource function get [string orderId]() returns Delivery|http:NotFound|error {
+        Delivery? d = check findDelivery(orderId);
+        if d is () {
+            return <http:NotFound>{body: {message: "No delivery for this order"}};
+        }
+        return d;
     }
 
-    resource function post [string deliveryId]/complete() returns http:Response {
-        // completeDelivery
+    // Where is my driver right now?
+    resource function get [string orderId]/location() returns DriverLocation|http:NotFound|error {
+        Delivery? d = check findDelivery(orderId);
+        if d is () || d.driverId == "" {
+            return <http:NotFound>{body: {message: "No driver assigned yet"}};
+        }
+        Driver? drv = check findDriver(d.driverId);
+        if drv is () {
+            return <http:NotFound>{body: {message: "Driver not found"}};
+        }
+        return {driverId: drv.driverId, lat: drv.lat, lng: drv.lng, updatedAt: drv.updatedAt};
     }
 
-    resource function get health() returns http:Response {
-        // healthCheck
+    // Driver collected the food
+    resource function post [string orderId]/pickup() returns Delivery|http:NotFound|http:Conflict|error {
+        Delivery? d = check findDelivery(orderId);
+        if d is () {
+            return <http:NotFound>{body: {message: "No delivery for this order"}};
+        }
+        if d.status != ASSIGNED {
+            return <http:Conflict>{body: {message: "Delivery must be ASSIGNED, it is " + d.status}};
+        }
+        check updateDelivery(orderId, {status: PICKED_UP});
+        check publishEvent("delivery.pickedup", orderId, {
+            eventId: uuid:createType4AsString(),
+            orderId: orderId,
+            driverId: d.driverId,
+            timestamp: nowIso()
+        });
+        d.status = PICKED_UP;
+        return d;
+    }
+
+    // Driver handed the food to the customer
+    resource function post [string orderId]/complete() returns Delivery|http:NotFound|http:Conflict|error {
+        Delivery? d = check findDelivery(orderId);
+        if d is () {
+            return <http:NotFound>{body: {message: "No delivery for this order"}};
+        }
+        if d.status != PICKED_UP {
+            return <http:Conflict>{body: {message: "Delivery must be PICKED_UP, it is " + d.status}};
+        }
+        check updateDelivery(orderId, {status: DELIVERED});
+        check setAvailability(d.driverId, true);
+        check publishEvent("delivery.completed", orderId, {
+            eventId: uuid:createType4AsString(),
+            orderId: orderId,
+            customerId: d.customerId,
+            driverId: d.driverId,
+            timestamp: nowIso()
+        });
+        d.status = DELIVERED;
+        check assignPending();
+        return d;
     }
 }

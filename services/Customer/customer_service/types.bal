@@ -1,19 +1,44 @@
-// customer_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+public type CustomerInput record {|
+    string name;
+    string email;
+    string phone;
+|};
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+public type CustomerUpdate record {|
+    string name;
+    string phone;
+|};
 
-// record Customer
-//     id, name, email, phone, createdAt
+public type Customer record {|
+    string customerId;
+    string name;
+    string email;
+    string phone;
+    string createdAt;
+|};
 
-// record Address
-//     id, customerId, label, street, city, notes, isDefault
+public type AddressInput record {|
+    string label;
+    string street;
+    string city;
+    string notes = "";
+|};
 
-// record CustomerInput / AddressInput
-//     request bodies (no id) for create/update
+public type Address record {|
+    string addressId;
+    string customerId;
+    string label;
+    string street;
+    string city;
+    string notes = "";
+|};
 
-// record OrderSummary
-//     local copy of order history: orderId, restaurantId, status, total, createdAt
-
-// record OrderEvent
-//     payload consumed from order topics
+public type OrderHistoryEntry record {|
+    string orderId;
+    string customerId;
+    string restaurantId = "";
+    float totalAmount = 0.0;
+    string status;
+    string createdAt;
+    string updatedAt;
+|};
