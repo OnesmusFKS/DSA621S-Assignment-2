@@ -1,26 +1,66 @@
-// customer_service: Kafka producers and consumers
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerina/log;
+import ballerinax/kafka;
 
-// initConsumer() returns error?
-//     subscribe to order status topics (orders.created, orders.status.changed)
+final kafka:Producer producer = check new (kafkaBootstrap, {
+    clientId: groupId + "-producer",
+    acks: "all",
+    retryCount: 3
+});
 
-// onOrderEvent(OrderEvent)
-//     map event to OrderSummary and upsert
+listener kafka:Listener orderListener = new (kafkaBootstrap, {
+    groupId: groupId,
+    topics: ["orders.created", "orders.status.changed", "orders.cancelled"],
+    offsetReset: kafka:OFFSET_RESET_EARLIEST
+});
 
-// ---- Reliability (all services) ----
+service on orderListener {
+    remote function onConsumerRecord(kafka:BytesConsumerRecord[] records) returns error? {
+        foreach kafka:BytesConsumerRecord rec in records {
+            string topic = rec.offset.partition.topic;
+            do {
+                json event = check parseEvent(rec.value);
+                check handleEvent(topic, event);
+            } on fail error e {
+                log:printError("Failed to process event from " + topic, 'error = e);
+                error? d = producer->send({topic: topic + ".dlq", value: rec.value});
+                if d is error {
+                    log:printError("Could not publish to DLQ", 'error = d);
+                }
+            }
+        }
+    }
+}
 
-// isEventProcessed(eventId) returns boolean
-//     idempotency check against a processed_events collection
-
-// markEventProcessed(eventId)
-//     record it AFTER successful handling (consider a TTL index)
-
-// handleWithRetry(event, handler)
-//     retry a failing handler N times with backoff before giving up
-
-// publishToDlq(originalTopic, event, errorReason)
-//     send to <topic>.dlq with error details
-
-// shutdownKafka()
-//     close producer/consumer cleanly on service stop
-
+function handleEvent(string topic, json event) returns error? {
+    string orderId = check getString(event, "orderId");
+    if !(check markProcessed(eventKey(topic, event))) {
+        return;
+    }
+    match topic {
+        "orders.created" => {
+            string customerId = check getString(event, "customerId");
+            OrderHistoryEntry? existing = check findOrderEntry(orderId);
+            if existing is () {
+                check insertOrderEntry({
+                    orderId: orderId,
+                    customerId: customerId,
+                    restaurantId: getOptString(event, "restaurantId") ?: "",
+                    totalAmount: getOptFloat(event, "totalAmount"),
+                    status: "CREATED",
+                    createdAt: nowIso(),
+                    updatedAt: nowIso()
+                });
+            }
+        }
+        "orders.status.changed" => {
+            string status = getOptString(event, "newStatus") ?: getOptString(event, "status") ?: "";
+            if status != "" {
+                check updateOrderStatus(orderId, status);
+            }
+        }
+        "orders.cancelled" => {
+            check updateOrderStatus(orderId, "CANCELLED");
+        }
+    }
+    log:printInfo("Processed " + topic + " for order " + orderId);
+}

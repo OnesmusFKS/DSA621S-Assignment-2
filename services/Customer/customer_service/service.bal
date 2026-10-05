@@ -1,75 +1,97 @@
 import ballerina/http;
-import ballerina/kafka;
-import ballerina/mongodb;
-import ballerina/log;
+import ballerina/uuid;
 
-configurable string kafkaBroker = ?;
-configurable string mongoUri = ?;
-configurable int customerServicePort = ?;
+public type CustomerCreated record {|
+    *http:Created;
+    Customer body;
+|};
 
-final kafka:Producer orderEventProducer = check new (kafkaBroker);
-final kafka:Consumer orderEventConsumer = check new (kafkaBroker, groupId = "customer-service");
-final mongodb:Client dbClient = check new (mongoUri);
+public type AddressCreated record {|
+    *http:Created;
+    Address body;
+|};
 
-// ---------- Kafka client setup ----------
-function getKafkaProducer() returns kafka:Producer {
-    // return producer instance
-}
+service /customers on new http:Listener(port) {
 
-function getKafkaConsumer() returns kafka:Consumer {
-    // return consumer instance
-}
-
-function getDbClient() returns mongodb:Client {
-    // return db client
-}
-
-// ---------- Kafka consumer: order events ----------
-function onOrderEvent() {
-    // subscribe to orders.created, orders.status.changed
-    // update local order history copy
-}
-
-// ---------- REST API ----------
-service /customers on new http:Listener(customerServicePort) {
-
-    resource function post registerCustomer(http:Request req) returns http:Response {
-        // create account
+    // Register a customer
+    resource function post .(CustomerInput input) returns CustomerCreated|http:BadRequest|http:Conflict|error {
+        if input.name.trim() == "" || input.email.trim() == "" {
+            return <http:BadRequest>{body: {message: "name and email are required"}};
+        }
+        Customer? existing = check findCustomerByEmail(input.email);
+        if existing is Customer {
+            return <http:Conflict>{body: {message: "Email already registered"}};
+        }
+        Customer c = {
+            customerId: uuid:createType4AsString(),
+            name: input.name,
+            email: input.email,
+            phone: input.phone,
+            createdAt: nowIso()
+        };
+        check insertCustomer(c);
+        return <CustomerCreated>{body: c};
     }
 
-    resource function get [string customerId]() returns http:Response {
-        // getCustomer
+    resource function get [string customerId]() returns Customer|http:NotFound|error {
+        Customer? c = check findCustomer(customerId);
+        if c is () {
+            return <http:NotFound>{body: {message: "Customer not found"}};
+        }
+        return c;
     }
 
-    resource function put [string customerId](http:Request req) returns http:Response {
-        // updateCustomer
+    resource function put [string customerId](CustomerUpdate update) returns Customer|http:NotFound|error {
+        Customer? c = check findCustomer(customerId);
+        if c is () {
+            return <http:NotFound>{body: {message: "Customer not found"}};
+        }
+        check updateCustomer(customerId, update);
+        c.name = update.name;
+        c.phone = update.phone;
+        return c;
     }
 
-    resource function delete [string customerId]() returns http:Response {
-        // deleteCustomer
+    // Delivery addresses
+    resource function post [string customerId]/addresses(AddressInput input) returns AddressCreated|http:NotFound|error {
+        Customer? c = check findCustomer(customerId);
+        if c is () {
+            return <http:NotFound>{body: {message: "Customer not found"}};
+        }
+        Address a = {
+            addressId: uuid:createType4AsString(),
+            customerId: customerId,
+            label: input.label,
+            street: input.street,
+            city: input.city,
+            notes: input.notes
+        };
+        check insertAddress(a);
+        return <AddressCreated>{body: a};
     }
 
-    resource function post [string customerId]/addresses(http:Request req) returns http:Response {
-        // addAddress
+    resource function get [string customerId]/addresses() returns Address[]|http:NotFound|error {
+        Customer? c = check findCustomer(customerId);
+        if c is () {
+            return <http:NotFound>{body: {message: "Customer not found"}};
+        }
+        return listAddresses(customerId);
     }
 
-    resource function get [string customerId]/addresses() returns http:Response {
-        // getAddresses
+    resource function delete [string customerId]/addresses/[string addressId]() returns http:NoContent|http:NotFound|error {
+        boolean deleted = check deleteAddress(customerId, addressId);
+        if !deleted {
+            return <http:NotFound>{body: {message: "Address not found"}};
+        }
+        return http:NO_CONTENT;
     }
 
-    resource function put [string customerId]/addresses/[string addressId](http:Request req) returns http:Response {
-        // updateAddress
-    }
-
-    resource function delete [string customerId]/addresses/[string addressId]() returns http:Response {
-        // removeAddress
-    }
-
-    resource function get [string customerId]/orders() returns http:Response {
-        // getOrderHistory (from local copy)
-    }
-
-    resource function get health() returns http:Response {
-        // healthCheck
+    // Historical orders (filled from Kafka events)
+    resource function get [string customerId]/orders() returns OrderHistoryEntry[]|http:NotFound|error {
+        Customer? c = check findCustomer(customerId);
+        if c is () {
+            return <http:NotFound>{body: {message: "Customer not found"}};
+        }
+        return listOrderHistory(customerId);
     }
 }
