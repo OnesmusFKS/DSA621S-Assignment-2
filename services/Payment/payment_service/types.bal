@@ -1,16 +1,25 @@
-// payment_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+// NOTE: Ballerina packages can't share code, so shared shapes are duplicated per service.
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+const string PENDING = "PENDING";
+const string COMPLETED = "COMPLETED";
+const string FAILED = "FAILED";
+const string REFUNDED = "REFUNDED";
 
-// enum PaymentStatus
-//     PENDING, COMPLETED, FAILED, REFUNDED
+public type PaymentInput record {|
+    string orderId;
+    string customerId = "";
+    decimal amount;
+    string method = "CARD";
+|};
 
-// record Payment
-//     id, orderId, customerId, amount, method, status, createdAt
-
-// record PaymentEvent
-//     payload published (orderId, paymentId, status, reason)
-
-// record OrderCreatedEvent
-//     payload consumed
+public type Payment record {|
+    string paymentId;
+    string orderId;
+    string customerId = "";
+    decimal amount;
+    string method = "CARD";
+    string status;
+    string reason = "";
+    string createdAt;
+    string updatedAt;
+|};

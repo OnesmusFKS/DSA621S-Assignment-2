@@ -1,25 +1,62 @@
-// order_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+// NOTE: Ballerina packages can't share code, so shared shapes are duplicated per service.
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+// ---------- statuses ----------
+const string CREATED = "CREATED";
+const string CONFIRMED = "CONFIRMED";
+const string PREPARING = "PREPARING";
+const string READY = "READY";
+const string OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY";
+const string DELIVERED = "DELIVERED";
+const string CANCELLED = "CANCELLED";
 
-// enum OrderStatus
-//     CREATED, CONFIRMED, PREPARING, READY, OUT_FOR_DELIVERY, DELIVERED, CANCELLED
+final readonly & map<string[]> allowedTransitions = {
+    [CREATED]: [CONFIRMED, CANCELLED],
+    [CONFIRMED]: [PREPARING, CANCELLED],
+    [PREPARING]: [READY],
+    [READY]: [OUT_FOR_DELIVERY],
+    [OUT_FOR_DELIVERY]: [DELIVERED],
+    [DELIVERED]: [],
+    [CANCELLED]: []
+};
 
-// record Order
-//     id, customerId, restaurantId, items, total, deliveryAddress, status, createdAt, updatedAt
+// ---------- records ----------
+public type OrderItem record {|
+    string itemId;
+    string name?;
+    int quantity;
+    decimal price;
+|};
 
-// record OrderItem
-//     menuItemId, name, quantity, unitPrice
+public type CreateOrderRequest record {|
+    string customerId;
+    string restaurantId;
+    OrderItem[] items;
+|};
 
-// record OrderInput
-//     request body for createOrder
+public type Order record {|
+    string orderId;
+    string customerId;
+    string restaurantId;
+    OrderItem[] items;
+    decimal totalAmount;
+    string status;
+    string createdAt;
+    string updatedAt;
+    string driverId?;
+    string idempotencyKey?;
+|};
 
-// record StatusHistoryEntry
-//     orderId, from, to, timestamp, actor
+// Audit trail: one entry per status transition
+public type StatusHistoryEntry record {|
+    string orderId;
+    string fromStatus;
+    string toStatus;
+    string reason = "";
+    string actor;
+    string timestamp;
+|};
 
-// record OrderEvent
-//     payload published to order topics
-
-// record PaymentEvent / DeliveryEvent / StockResultEvent
-//     payloads consumed
+// ---------- errors ----------
+public type OrderNotFoundError distinct error;
+public type InvalidTransitionError distinct error;
+public type ConcurrentUpdateError distinct error;

@@ -1,22 +1,58 @@
-// restaurant_service: Records / enums to define
-// STUB FILE: comments only, no code. Implement each item below.
+// NOTE: Ballerina packages can't share code, so shared shapes are duplicated per service.
 
-// NOTE: Ballerina packages can't share code: duplicate any shared records per service and keep them matching docs/events.md.
+public type OpeningHours record {|
+    string openTime;   // "HH:mm", UTC
+    string closeTime;  // "HH:mm", UTC (may be earlier than openTime for overnight hours)
+|};
 
-// record Restaurant
-//     id, name, cuisine, address, phone, isActive
+public type Restaurant record {
+    string restaurantId;
+    string name;
+    string address?;
+    OpeningHours hours?;
+};
 
-// record MenuItem
-//     id, restaurantId, name, description, price, category, available
+public type MenuItem record {
+    string itemId;
+    string restaurantId?;
+    string name;
+    decimal price;
+    int stock = 0;
+};
 
-// record InventoryItem
-//     menuItemId, restaurantId, quantity, lowStockThreshold
+public type OrderItem record {
+    string itemId;
+    int quantity;
+};
 
-// record OpeningHours
-//     restaurantId, per-day open/close times, holiday overrides
+public type StockRequest record {
+    OrderItem[] items;
+};
 
-// record OrderCreatedEvent
-//     payload consumed from orders.created
+// Payload consumed from orders.created
+public type OrderCreated record {
+    string orderId;
+    string restaurantId;
+    OrderItem[] items;
+};
 
-// record StockResultEvent
-//     orderId, restaurantId, reserved (bool), reason
+// Outcome of checking opening hours + stock for one order
+public type StockDecision record {|
+    boolean reserved;
+    string reason = "";
+|};
+
+// One document per order we have decided on. Used for idempotency (duplicate
+// events never reserve twice) and to give the stock back when the order is cancelled.
+public type StockReservation record {|
+    string orderId;
+    string restaurantId;
+    OrderItem[] items;
+    boolean reserved;
+    string reason = "";
+    boolean released = false;
+    string createdAt;
+|};
+
+public type RestaurantNotFoundError distinct error;
+public type InvalidQuantityError distinct error;

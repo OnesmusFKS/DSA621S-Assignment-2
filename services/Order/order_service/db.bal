@@ -1,27 +1,78 @@
-// order_service: Database access functions
-// STUB FILE: comments only, no code. Implement each item below.
+import ballerinax/mongodb;
 
-// initDb() returns error?
-//     create client, indexes (customerId, restaurantId, status)
+// Database isolation: this service owns ONLY order_db.
+final mongodb:Client mongoClient = check new ({connection: mongoUri});
+final mongodb:Database db = check mongoClient->getDatabase(dbName);
 
-// insertOrder / findOrderById / findOrdersByCustomer / findOrdersByRestaurant
-//     
+// ---------- reliability ----------
+function isProcessed(string eventId) returns boolean|error {
+    mongodb:Collection c = check db->getCollection("processed_events");
+    int n = check c->countDocuments({eventId: eventId});
+    return n > 0;
+}
 
-// updateOrderStatusDoc(orderId, newStatus)
-//     persist status change
+// Call AFTER the event was handled successfully
+function markProcessed(string eventId) returns error? {
+    mongodb:Collection c = check db->getCollection("processed_events");
+    check c->insertOne({eventId: eventId, processedAt: nowIso()});
+}
 
-// appendStatusHistory(entry)
-//     audit trail of every transition
+// Used by /health
+function checkDbConnection() returns boolean {
+    string[]|error names = db->listCollectionNames();
+    return names is string[];
+}
 
-// findOrderByIdempotencyKey(key)
-//     avoid duplicate orders on retry
+// ---------- orders ----------
+function insertOrder(Order o) returns error? {
+    mongodb:Collection c = check db->getCollection("orders");
+    check c->insertOne(o);
+}
 
-// ---- Reliability (all services) ----
+function findOrderById(string orderId) returns Order|error? {
+    mongodb:Collection c = check db->getCollection("orders");
+    return check c->findOne({orderId: orderId}, projection = {"_id": 0}, targetType = Order);
+}
 
-// insertProcessedEvent / findProcessedEvent
-//     processed_events collection, unique index on eventId
+// Avoids duplicate orders when a client retries the same request
+function findOrderByIdempotencyKey(string key) returns Order|error? {
+    mongodb:Collection c = check db->getCollection("orders");
+    return check c->findOne({idempotencyKey: key}, projection = {"_id": 0}, targetType = Order);
+}
 
-// checkDbConnection() returns boolean
-//     used by /health
+function listOrders(map<json> filter) returns Order[]|error {
+    mongodb:Collection c = check db->getCollection("orders");
+    stream<Order, error?> s = check c->find(filter, projection = {"_id": 0}, targetType = Order);
+    return from Order o in s select o;
+}
 
-// Database isolation: this service owns ONLY `order_db`. Never read another service's DB.
+function findOrdersByCustomer(string customerId) returns Order[]|error => listOrders({customerId: customerId});
+
+function findOrdersByRestaurant(string restaurantId) returns Order[]|error => listOrders({restaurantId: restaurantId});
+
+// Compare-and-set: only flips the status if it is still `fromStatus`. Returns false if someone else changed it first.
+function updateOrderStatusDoc(string orderId, string fromStatus, string toStatus, string updatedAt) returns boolean|error {
+    mongodb:Collection c = check db->getCollection("orders");
+    mongodb:UpdateResult r = check c->updateOne(
+        {orderId: orderId, status: fromStatus},
+        {set: {status: toStatus, updatedAt: updatedAt}}
+    );
+    return r.matchedCount > 0;
+}
+
+function setOrderDriver(string orderId, string driverId) returns error? {
+    mongodb:Collection c = check db->getCollection("orders");
+    _ = check c->updateOne({orderId: orderId}, {set: {driverId: driverId, updatedAt: nowIso()}});
+}
+
+// ---------- status history ----------
+function appendStatusHistory(StatusHistoryEntry e) returns error? {
+    mongodb:Collection c = check db->getCollection("order_status_history");
+    check c->insertOne(e);
+}
+
+function listStatusHistory(string orderId) returns StatusHistoryEntry[]|error {
+    mongodb:Collection c = check db->getCollection("order_status_history");
+    stream<StatusHistoryEntry, error?> s = check c->find({orderId: orderId}, projection = {"_id": 0}, targetType = StatusHistoryEntry);
+    return from StatusHistoryEntry h in s select h;
+}

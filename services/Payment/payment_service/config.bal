@@ -1,11 +1,8 @@
-// payment: Configuration
-// STUB FILE: comments only, no code. Implement each item below.
+configurable int port = 9004;
+configurable string mongoUri = "mongodb://localhost:27017";
+configurable string dbName = "payment_db";
+configurable string kafkaBootstrap = "localhost:9092";
+configurable string groupId = "payment-service";
 
-// configurable values to declare (read from Config.toml / env vars, never hardcode):
-//     port                 (this service: 9004)
-//     kafkaBootstrapServers (e.g. kafka:9092 inside Docker, localhost:9092 locally)
-//     consumerGroupId      (unique per service, e.g. "payment-service-group")
-//     dbUri / dbName       (database: payment_db)
-//     dbUser / dbPassword  (do not commit real values, use .env)
-//
-// Remember: inside Docker Compose, use service names (kafka, mongo), not localhost.
+// Simulated payment processor: share of payments that get declined (0.0 = never, 1.0 = always)
+configurable decimal failureRate = 0.1;
