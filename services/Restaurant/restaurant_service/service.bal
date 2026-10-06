@@ -47,7 +47,7 @@ service /restaurants on new http:Listener(port) {
         if !checkDbConnection() {
             return <http:ServiceUnavailable>{body: {"service": "restaurant-service", "status": "DOWN"}};
         }
-        return {body: {"service": "restaurant-service", "status": "UP"}};
+        return <http:Ok>{body: {"service": "restaurant-service", "status": "UP"}};
     }
 
     // Get one restaurant

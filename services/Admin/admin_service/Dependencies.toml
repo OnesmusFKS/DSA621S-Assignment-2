@@ -116,9 +116,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "lang.value"}
 ]
-modules = [
-	{org = "ballerina", packageName = "io", moduleName = "io"}
-]
 
 [[package]]
 org = "ballerina"
@@ -373,11 +370,10 @@ modules = [
 
 [[package]]
 org = "onesmus"
-name = "notification_service"
+name = "admin_service"
 version = "0.1.0"
 dependencies = [
 	{org = "ballerina", name = "http"},
-	{org = "ballerina", name = "io"},
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "time"},
 	{org = "ballerinai", name = "observe"},
@@ -385,6 +381,6 @@ dependencies = [
 	{org = "ballerinax", name = "mongodb"}
 ]
 modules = [
-	{org = "onesmus", packageName = "notification_service", moduleName = "notification_service"}
+	{org = "onesmus", packageName = "admin_service", moduleName = "admin_service"}
 ]
 

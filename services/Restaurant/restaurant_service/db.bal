@@ -2,25 +2,32 @@ import ballerinax/mongodb;
 
 // Database isolation: this service owns ONLY restaurant_db.
 final mongodb:Client mongoClient = check new ({connection: mongoUri});
-final mongodb:Database db = check mongoClient->getDatabase(dbName);
 
-function getCollection(string name) returns mongodb:Collection|error => db->getCollection(name);
+function getDb() returns mongodb:Database|error {
+    return mongoClient->getDatabase(dbName);
+}
+
+function getCollection(string name) returns mongodb:Collection|error {
+    mongodb:Database database = check getDb();
+    return database->getCollection(name);
+}
 
 // ---------- reliability ----------
 function isProcessed(string eventId) returns boolean|error {
     mongodb:Collection c = check getCollection("processed_events");
-    int n = check c->countDocuments({eventId: eventId});
+    int n = check c->countDocuments({"eventId": eventId});
     return n > 0;
 }
 
 // Call AFTER the event was handled successfully
 function markProcessed(string eventId) returns error? {
     mongodb:Collection c = check getCollection("processed_events");
-    check c->insertOne({eventId: eventId, processedAt: nowIso()});
+    check c->insertOne({"eventId": eventId, "processedAt": nowIso()});
 }
 
 // Used by /health
 function checkDbConnection() returns boolean {
+    mongodb:Database db = checkpanic getDb();
     string[]|error names = db->listCollectionNames();
     return names is string[];
 }
@@ -35,7 +42,7 @@ function findRestaurant(string restaurantId) returns Restaurant?|error {
     mongodb:Collection restaurants = check getCollection("restaurants");
     // Hide Mongo's internal _id so records bind and serialise cleanly.
     Restaurant? found = check restaurants->findOne(
-        {restaurantId},
+        {"restaurantId": restaurantId},
         projection = {"_id": 0},
         targetType = Restaurant
     );
@@ -57,8 +64,8 @@ function listRestaurants() returns Restaurant[]|error {
 function setOpeningHours(string restaurantId, OpeningHours hours) returns boolean|error {
     mongodb:Collection restaurants = check getCollection("restaurants");
     mongodb:UpdateResult res = check restaurants->updateOne(
-        {restaurantId},
-        {set: {hours: hours}}
+        {"restaurantId": restaurantId},
+        {set: {"hours": hours}}
     );
     return res.matchedCount > 0;
 }
@@ -66,29 +73,29 @@ function setOpeningHours(string restaurantId, OpeningHours hours) returns boolea
 // ---------- menu ----------
 function addMenuItem(string restaurantId, MenuItem item) returns error? {
     mongodb:Collection menu = check getCollection("menu_items");
-    MenuItem toSave = {...item, restaurantId};
+    MenuItem toSave = {...item, "restaurantId": restaurantId};
     check menu->insertOne(toSave);
 }
 
 function updateMenuItem(string restaurantId, string itemId, MenuItem item) returns boolean|error {
     mongodb:Collection menu = check getCollection("menu_items");
     mongodb:UpdateResult res = check menu->updateOne(
-        {restaurantId, itemId},
-        {set: {name: item.name, price: item.price, stock: item.stock}}
+        {"restaurantId": restaurantId, "itemId": itemId},
+        {set: {"name": item.name, "price": item.price, "stock": item.stock}}
     );
     return res.matchedCount > 0;
 }
 
 function removeMenuItem(string restaurantId, string itemId) returns boolean|error {
     mongodb:Collection menu = check getCollection("menu_items");
-    mongodb:DeleteResult res = check menu->deleteOne({restaurantId, itemId});
+    mongodb:DeleteResult res = check menu->deleteOne({"restaurantId": restaurantId, "itemId": itemId});
     return res.deletedCount > 0;
 }
 
 function getMenu(string restaurantId) returns MenuItem[]|error {
     mongodb:Collection menu = check getCollection("menu_items");
     stream<MenuItem, error?> results = check menu->find(
-        {restaurantId},
+        {"restaurantId": restaurantId},
         projection = {"_id": 0},
         targetType = MenuItem
     );
@@ -101,7 +108,7 @@ function getMenu(string restaurantId) returns MenuItem[]|error {
 function checkStock(string restaurantId, string itemId) returns int?|error {
     mongodb:Collection menu = check getCollection("menu_items");
     MenuItem? item = check menu->findOne(
-        {restaurantId, itemId},
+        {"restaurantId": restaurantId, "itemId": itemId},
         projection = {"_id": 0},
         targetType = MenuItem
     );
@@ -112,8 +119,8 @@ function checkStock(string restaurantId, string itemId) returns int?|error {
 function decrementStockAtomic(string restaurantId, string itemId, int qty) returns boolean|error {
     mongodb:Collection menu = check getCollection("menu_items");
     mongodb:UpdateResult res = check menu->updateOne(
-        {restaurantId, itemId, stock: {"$gte": qty}},
-        {inc: {stock: -qty}}
+        {"restaurantId": restaurantId, "itemId": itemId, "stock": {"$gte": qty}},
+        {inc: {"stock": -qty}}
     );
     return res.modifiedCount > 0;
 }
@@ -121,7 +128,7 @@ function decrementStockAtomic(string restaurantId, string itemId, int qty) retur
 // Put stock back (cancel / failure / rollback)
 function incrementStock(string restaurantId, string itemId, int qty) returns error? {
     mongodb:Collection menu = check getCollection("menu_items");
-    _ = check menu->updateOne({restaurantId, itemId}, {inc: {stock: qty}});
+    _ = check menu->updateOne({"restaurantId": restaurantId, "itemId": itemId}, {inc: {"stock": qty}});
 }
 
 // ---------- reservations ----------
@@ -132,10 +139,10 @@ function insertReservation(StockReservation r) returns error? {
 
 function findReservation(string orderId) returns StockReservation|error? {
     mongodb:Collection c = check getCollection("stock_reservations");
-    return check c->findOne({orderId: orderId}, projection = {"_id": 0}, targetType = StockReservation);
+    return check c->findOne({"orderId": orderId}, projection = {"_id": 0}, targetType = StockReservation);
 }
 
 function markReservationReleased(string orderId) returns error? {
     mongodb:Collection c = check getCollection("stock_reservations");
-    _ = check c->updateOne({orderId: orderId}, {set: {released: true}});
+    _ = check c->updateOne({"orderId": orderId}, {set: {"released": true}});
 }
